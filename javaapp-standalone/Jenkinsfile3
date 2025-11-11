@@ -16,7 +16,7 @@ pipeline {
         // --- Stage 1: Clone your Git repo ---
         stage('Cloning Git') {
             steps {
-                git branch: 'master', url: 'https://github.com/Vandu0409/jenkins.git'
+                git branch: 'master', url: 'https://github.com/devops-sunetra/jenkins-eks.git'
             }
         }
 
