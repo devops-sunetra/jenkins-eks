@@ -3,8 +3,8 @@ pipeline {
 
     environment {
         AWS_REGION = 'ap-south-1'
-        ACCOUNT_ID = '905418283021'
-        REPO_NAME = 'my-docker-repo'
+        ACCOUNT_ID = '655445510312'
+        REPO_NAME = 'docker-image'
         REGISTRY = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
         IMAGE_TAG = "${BUILD_NUMBER}"
         CLUSTER_NAME = 'demo-eks'
