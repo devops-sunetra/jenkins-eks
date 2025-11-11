@@ -2,9 +2,8 @@ replicaCount: 2
 
 image:
   repository: 905418283021.dkr.ecr.ap-south-1.amazonaws.com/my-docker-repo
-  tag: ""                # Jenkins will override this dynamically via --set image.tag
+  tag: ""                     # Jenkins dynamically sets this
   pullPolicy: IfNotPresent
-  # imagePullSecrets: ["regcred"]   # Uncomment if your repo requires auth (ECR handles this via IAM)
 
 service:
   type: ClusterIP
@@ -12,7 +11,7 @@ service:
   targetPort: 5000
 
 resources: {}
-# Example (optional):
+# Optional resource limits
 # resources:
 #   requests:
 #     cpu: 100m
@@ -22,7 +21,7 @@ resources: {}
 #     memory: 512Mi
 
 env: []
-# Example:
+# Example environment variable:
 # env:
 #   - name: SPRING_PROFILES_ACTIVE
 #     value: "prod"
@@ -50,9 +49,17 @@ ingress:
   className: nginx
   annotations:
     kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
   hosts:
-  - host: a41f2251e6e074755ba767edb9eab02e-884550417.ap-south-1.elb.amazonaws.com
-    paths:
-      - path: /
-        pathType: Prefix
-  tls: []  # Optional, add cert-manager or ACM configuration here
+    - host: aa283450300f34c378409551c76dd51f-262264222.ap-south-1.elb.amazonaws.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # Example if you enable TLS later:
+  # tls:
+  #   - secretName: my-java-app-tls
+  #     hosts:
+  #       - yourdomain.com
+
