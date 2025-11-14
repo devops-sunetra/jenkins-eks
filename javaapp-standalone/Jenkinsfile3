@@ -1,26 +1,6 @@
-pipeline {
-    agent {
-        kubernetes {
-            yaml """
-apiVersion: v1
-kind: Pod
-spec:
-  containers:
-  - name: jnlp
-    image: jenkins/inbound-agent:latest
-    resources:
-      limits:
-        memory: "2Gi"
-        cpu: "1"
-  - name: kaniko
-    image: gcr.io/kaniko-project/executor:latest
-    command:
-    - cat
-    tty: true
-"""
-        }
-    }
 
+pipeline {
+    agent any  // use the existing Jenkins pod
     environment {
         AWS_REGION = 'ap-south-1'
         ACCOUNT_ID = '655445510312'
@@ -29,69 +9,63 @@ spec:
         IMAGE_TAG = "${BUILD_NUMBER}"
         CLUSTER_NAME = 'demo-eks'
         NAMESPACE = 'helm-deployment'
-        JAVA_HOME = '/usr/lib/jvm/java-17-openjdk-amd64'
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
         PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
-
+    
     stages {
-        stage('Clone Git Repo') {
+        stage('Cloning Git') {
             steps {
                 git branch: 'master', url: 'https://github.com/devops-sunetra/jenkins-eks.git'
             }
         }
-
-        stage('Verify Java & Maven') {
+        stage('Verify Java') {
             steps {
                 sh 'java -version'
                 sh 'javac -version'
-                sh 'mvn -version || echo "Maven not found, ensure your agent image has Maven installed"'
             }
         }
-
-        stage('Build Java Project') {
+        stage('Build Maven Project') {
             steps {
                 dir('javaapp-standalone') {
                     sh 'mvn clean install'
                 }
             }
         }
-
-        stage('Build & Push Docker Image via Kaniko') {
+        stage('Build Docker Image with Kaniko') {
             steps {
-                container('kaniko') {
-                    dir("${WORKSPACE}/javaapp-standalone") {
-                        sh """
-                        /kaniko/executor \
-                          --dockerfile=Dockerfile \
-                          --context=dir://. \
-                          --destination=${REGISTRY}:${IMAGE_TAG} \
-                          --skip-tls-verify
-                        """
-                    }
+                dir('javaapp-standalone') {
+                    sh """
+                    kubectl run kaniko \
+                      --rm -i --tty \
+                      --image=gcr.io/kaniko-project/executor:latest \
+                      --restart=Never \
+                      -- \
+                      --dockerfile=Dockerfile \
+                      --context=dir://. \
+                      --destination=${REGISTRY}:${IMAGE_TAG} \
+                      --skip-tls-verify
+                    """
                 }
             }
         }
-
-        stage('Deploy to EKS with Helm') {
+        stage('Helm Deploy') {
             steps {
                 sh """
                 aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
                 kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
                 helm upgrade --install my-java-app ./javaapp-standalone/chart/my-java-app \
                   --namespace ${NAMESPACE} \
+                  --create-namespace \
                   --set image.repository=${REGISTRY} \
                   --set image.tag=${IMAGE_TAG}
                 """
             }
         }
     }
-
+    
     post {
-        success {
-            echo "✅ Deployment successful! App deployed to EKS cluster: ${CLUSTER_NAME}"
-        }
-        failure {
-            echo "❌ Pipeline failed. Check Jenkins logs for details."
-        }
+        success { echo "✅ Deployment successful!" }
+        failure { echo "❌ Pipeline failed. Check logs." }
     }
 }
