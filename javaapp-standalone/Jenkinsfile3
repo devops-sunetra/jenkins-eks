@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    tools {
+        // These names must match the names you configured in Jenkins global tools
+        jdk 'JDK 21'
+        maven 'Maven 3.9'
+    }
+
     environment {
         AWS_REGION = 'ap-south-1'
         ACCOUNT_ID = '655445510312'
@@ -13,21 +19,19 @@ pipeline {
 
     stages {
 
-        // --- Stage 1: Clone your Git repo ---
         stage('Cloning Git') {
             steps {
                 git branch: 'master', url: 'https://github.com/devops-sunetra/jenkins-eks.git'
             }
         }
+
         stage('Verify Java') {
-    steps {
-        sh 'java -version'
-        sh 'javac -version'
-    }
-}
+            steps {
+                sh 'java -version'
+                sh 'javac -version'
+            }
+        }
 
-
-        // --- Stage 2: Build Java app ---
         stage('Build Maven Project') {
             steps {
                 dir('javaapp-standalone') {
@@ -36,7 +40,6 @@ pipeline {
             }
         }
 
-        // --- Stage 3: Build Docker image ---
         stage('Build Docker Image') {
             steps {
                 dir('javaapp-standalone') {
@@ -47,7 +50,6 @@ pipeline {
             }
         }
 
-        // --- Stage 4: Push Docker image to AWS ECR ---
         stage('Push to ECR') {
             steps {
                 script {
@@ -60,27 +62,17 @@ pipeline {
             }
         }
 
-        // --- Stage 5: Deploy to EKS via Helm ---
         stage('Helm Deploy') {
             steps {
                 script {
-                    // Update kubeconfig (ensures Jenkins can talk to cluster)
                     sh """
                     aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
-                    """
-
-                    // Ensure namespace exists
-                    sh """
                     kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                    """
-
-                    // Deploy Helm chart with latest image tag
-                   sh """
-                        helm upgrade --install my-java-app ./javaapp-standalone/chart/my-java-app \
-                          --namespace ${NAMESPACE} \
-                          --create-namespace \
-                          --set image.repository=${REGISTRY} \
-                          --set image.tag=${IMAGE_TAG}
+                    helm upgrade --install my-java-app ./javaapp-standalone/chart/my-java-app \
+                      --namespace ${NAMESPACE} \
+                      --create-namespace \
+                      --set image.repository=${REGISTRY} \
+                      --set image.tag=${IMAGE_TAG}
                     """
                 }
             }
