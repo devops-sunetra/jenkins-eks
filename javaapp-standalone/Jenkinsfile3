@@ -1,30 +1,32 @@
-
 pipeline {
-    agent any  // use the existing Jenkins pod
+    agent any
+
     environment {
-        AWS_REGION = 'ap-south-1'
-        ACCOUNT_ID = '655445510312'
-        REPO_NAME = 'docker-image'
-        REGISTRY = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        AWS_REGION   = 'ap-south-1'
+        ACCOUNT_ID   = '655445510312'
+        REPO_NAME    = 'docker-image'
+        REGISTRY     = "${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${REPO_NAME}"
+        IMAGE_TAG    = "${BUILD_NUMBER}"
         CLUSTER_NAME = 'demo-eks'
-        NAMESPACE = 'helm-deployment'
-        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
-        PATH = "${JAVA_HOME}/bin:${env.PATH}"
+        NAMESPACE    = 'helm-deployment'
+        JAVA_HOME    = '/usr/lib/jvm/java-17-openjdk-amd64'
+        PATH         = "${JAVA_HOME}/bin:${env.PATH}"
     }
-    
+
     stages {
-        stage('Cloning Git') {
+        stage('Clone Git') {
             steps {
                 git branch: 'master', url: 'https://github.com/devops-sunetra/jenkins-eks.git'
             }
         }
+
         stage('Verify Java') {
             steps {
                 sh 'java -version'
                 sh 'javac -version'
             }
         }
+
         stage('Build Maven Project') {
             steps {
                 dir('javaapp-standalone') {
@@ -32,40 +34,72 @@ pipeline {
                 }
             }
         }
-        stage('Build Docker Image with Kaniko') {
+
+        stage('Build & Push Docker Image using Kaniko') {
             steps {
-                dir('javaapp-standalone') {
+                script {
+                    // Make sure kubectl is configured to access your EKS cluster
+                    sh "aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}"
+
+                    // Run Kaniko pod in the cluster
                     sh """
                     kubectl run kaniko \
                       --rm -i --tty \
-                      --image=gcr.io/kaniko-project/executor:latest \
                       --restart=Never \
-                      -- \
-                      --dockerfile=Dockerfile \
-                      --context=dir://. \
-                      --destination=${REGISTRY}:${IMAGE_TAG} \
-                      --skip-tls-verify
+                      --image=gcr.io/kaniko-project/executor:latest \
+                      --overrides='
+                      {
+                        "spec": {
+                          "containers": [{
+                            "name": "kaniko",
+                            "image": "gcr.io/kaniko-project/executor:latest",
+                            "volumeMounts": [{
+                              "name": "workspace",
+                              "mountPath": "/workspace"
+                            }],
+                            "args": [
+                              "--dockerfile=/workspace/javaapp-standalone/Dockerfile",
+                              "--context=dir:///workspace/javaapp-standalone",
+                              "--destination=${REGISTRY}:${IMAGE_TAG}",
+                              "--skip-tls-verify"
+                            ]
+                          }],
+                          "volumes": [{
+                            "name": "workspace",
+                            "hostPath": {
+                              "path": "/var/jenkins_home/workspace/eks-pipeline/javaapp-standalone",
+                              "type": "Directory"
+                            }
+                          }]
+                        }
+                      }'
                     """
                 }
             }
         }
+
         stage('Helm Deploy') {
             steps {
-                sh """
-                aws eks update-kubeconfig --region ${AWS_REGION} --name ${CLUSTER_NAME}
-                kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-                helm upgrade --install my-java-app ./javaapp-standalone/chart/my-java-app \
-                  --namespace ${NAMESPACE} \
-                  --create-namespace \
-                  --set image.repository=${REGISTRY} \
-                  --set image.tag=${IMAGE_TAG}
-                """
+                script {
+                    sh """
+                    kubectl create namespace ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                    helm upgrade --install my-java-app ./javaapp-standalone/chart/my-java-app \
+                      --namespace ${NAMESPACE} \
+                      --set image.repository=${REGISTRY} \
+                      --set image.tag=${IMAGE_TAG}
+                    """
+                }
             }
         }
     }
-    
+
     post {
-        success { echo "✅ Deployment successful!" }
-        failure { echo "❌ Pipeline failed. Check logs." }
+        success {
+            echo "✅ Deployment successful! App deployed to EKS cluster: ${CLUSTER_NAME}"
+        }
+        failure {
+            echo "❌ Pipeline failed. Check Jenkins logs for details."
+        }
     }
 }
+
