@@ -15,6 +15,8 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
         CLUSTER_NAME = 'demo-eks'
         NAMESPACE = 'helm-deployment'
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        PATH = "${JAVA_HOME}/bin:${env.PATH}"
     }
 
     stages {
@@ -36,10 +38,6 @@ pipeline {
             steps {
                 dir('javaapp-standalone') {
                       sh '''
-            export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
-            export PATH=$JAVA_HOME/bin:$PATH
-            java -version
-            javac -version
             mvn clean install
             '''
                 }
