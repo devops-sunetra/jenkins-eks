@@ -53,8 +53,7 @@ ingress:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
     alb.ingress.kubernetes.io/target-type: ip
   hosts:
-    - host:
-      paths:
+    - paths:
         - path: /
           pathType: Prefix
   tls: []
