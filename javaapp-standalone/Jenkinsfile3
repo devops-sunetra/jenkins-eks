@@ -35,7 +35,13 @@ pipeline {
         stage('Build Maven Project') {
             steps {
                 dir('javaapp-standalone') {
-                    sh 'mvn clean install'
+                      sh '''
+            export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+            export PATH=$JAVA_HOME/bin:$PATH
+            java -version
+            javac -version
+            mvn clean install
+            '''
                 }
             }
         }
