@@ -19,6 +19,13 @@ pipeline {
                 git branch: 'master', url: 'https://github.com/devops-sunetra/jenkins-eks.git'
             }
         }
+        stage('Verify Java') {
+    steps {
+        sh 'java -version'
+        sh 'javac -version'
+    }
+}
+
 
         // --- Stage 2: Build Java app ---
         stage('Build Maven Project') {
