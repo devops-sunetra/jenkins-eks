@@ -1,11 +1,7 @@
 pipeline {
     agent any
 
-    tools {
-        // These names must match the names you configured in Jenkins global tools
-        jdk 'JDK 21'
-        maven 'Maven 3.9'
-    }
+   
 
     environment {
         AWS_REGION = 'ap-south-1'
