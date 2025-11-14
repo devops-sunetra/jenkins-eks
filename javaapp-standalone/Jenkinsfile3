@@ -44,7 +44,18 @@ pipeline {
             steps {
                 dir('javaapp-standalone') {
                     script {
-                        dockerImage = docker.build("${REGISTRY}:${IMAGE_TAG}", ".")
+                        sh """
+            # Use Kaniko container to build and push image
+            kubectl run kaniko \
+              --rm -i --tty \
+              --image=gcr.io/kaniko-project/executor:latest \
+              --restart=Never \
+              -- \
+              --dockerfile=javaapp-standalone/Dockerfile \
+              --context=dir://javaapp-standalone \
+              --destination=${REGISTRY}:${IMAGE_TAG} \
+              --skip-tls-verify
+            """
                     }
                 }
             }
