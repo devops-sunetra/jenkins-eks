@@ -1,7 +1,7 @@
 replicaCount: 2
 
 image:
-  repository: 905418283021.dkr.ecr.ap-south-1.amazonaws.com/my-docker-repo
+  repository: 655445510312.dkr.ecr.ap-south-1.amazonaws.com/jenkins/cicd
   tag: ""                     # Jenkins dynamically sets this
   pullPolicy: IfNotPresent
 
@@ -46,13 +46,14 @@ readinessProbe:
 
 ingress:
   enabled: true
-  className: nginx
+  className: alb
   annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+    alb.ingress.kubernetes.io/target-type: ip
   hosts:
-    - host: aa283450300f34c378409551c76dd51f-262264222.ap-south-1.elb.amazonaws.com
+    - host: "*"
       paths:
         - path: /
           pathType: Prefix
